@@ -96,8 +96,6 @@ TABLE_RANGES = {
 |------|------|
 | Python | 3.11 이상 |
 | [uv](https://docs.astral.sh/uv/) | 최신 |
-| Docker | 20.10 이상 (GPU 서버 기동 시 필요) |
-| NVIDIA GPU + Driver | CUDA 지원 GPU (vLLM 서버 사용 시) |
 | ASME B31.1 PDF | 직접 구매 후 프로젝트 루트에 `ASME-B31.1.pdf` 로 배치 |
 
 > **PDF는 저작권 파일이므로 이 저장소에 포함되어 있지 않습니다.**  
@@ -107,33 +105,8 @@ TABLE_RANGES = {
 
 ## 설치 및 실행
 
-> **이 파이프라인은 PyMuPDF 좌표 파싱만으로 동작하므로 vLLM 서버 없이도 실행됩니다.**  
-> 아래 vLLM 서버 기동은 선택 사항입니다 (향후 VLM 기반 파싱 실험 시 사용).
-
-### (선택) vLLM 서버 기동 — GPU 필요
-
-NVIDIA GPU가 있는 경우, PaddleOCR-VL 추론 서버를 Docker로 기동할 수 있습니다.
-
-```bash
-docker run \
-    --rm \
-    --gpus all \
-    --network host \
-    ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddleocr-genai-vllm-server:latest-nvidia-gpu \
-    paddleocr genai_server \
-        --model_name PaddleOCR-VL-1.5-0.9B \
-        --host 0.0.0.0 \
-        --port 8080 \
-        --backend vllm
-```
-
-서버가 `http://localhost:8080` 에서 OpenAI 호환 API로 응답하면 준비 완료.  
-로그에 `Application startup complete` 메시지가 나오면 사용 가능합니다.
-
-> Windows WSL2 사용자는 Docker Desktop이 실행 중인 상태에서 WSL Ubuntu 터미널에서 위 명령을 실행하세요.  
-> GPU가 없는 환경에서는 `--gpus all` 제거 후 CPU 모드로 기동 가능하나 속도가 매우 느립니다.
-
----
+> **이 파이프라인은 GPU/Docker/VLM 없이 순수 PyMuPDF 텍스트 파싱만으로 동작합니다.**  
+> Python + uv만 있으면 바로 실행 가능합니다.
 
 ### Ubuntu (권장)
 
@@ -321,3 +294,60 @@ con.close()
 - 이 저장소는 파싱 코드만 포함합니다. **ASME B31.1 PDF는 포함되지 않습니다.**
 - 파싱 결과는 검증 스팟체크를 통과하였으나, 안전 관련 설계에 사용 시 원본 ASME 문서와 반드시 대조하세요.
 - `*` 표시 값은 creep/stress rupture 지배 구간 (원본에서 이탤릭체로 표기된 값)입니다.
+
+---
+
+## 스캔 문서(이미지 PDF)인 경우 — VLM 사용 권장
+
+이 파이프라인은 **텍스트 레이어가 있는 디지털 PDF** 전용입니다.  
+ASME 공식 구매본은 텍스트 레이어가 있어서 PyMuPDF로 바로 읽히지만,  
+**종이를 스캔한 PDF나 이미지로만 구성된 PDF** 라면 텍스트 좌표를 읽을 수 없으므로 이 방식이 동작하지 않습니다.
+
+### 스캔 문서 판별 방법
+
+PDF를 열고 텍스트를 마우스로 드래그해서 선택이 되면 → 디지털 PDF (이 파이프라인 사용 가능)  
+텍스트가 선택되지 않고 그림처럼만 보이면 → 스캔 문서 (VLM 필요)
+
+### 스캔 문서일 때: PaddleOCR-VL vLLM 서버 사용
+
+NVIDIA GPU가 있는 환경에서 아래 명령으로 PaddleOCR-VL 추론 서버를 기동합니다.
+
+```bash
+docker run \
+    --rm \
+    --gpus all \
+    --network host \
+    ccr-2vdh3abv-pub.cnc.bj.baidubce.com/paddlepaddle/paddleocr-genai-vllm-server:latest-nvidia-gpu \
+    paddleocr genai_server \
+        --model_name PaddleOCR-VL-1.5-0.9B \
+        --host 0.0.0.0 \
+        --port 8080 \
+        --backend vllm
+```
+
+로그에 `Application startup complete` 가 뜨면 서버 준비 완료.  
+이후 `http://localhost:8080` 에서 OpenAI 호환 API로 이미지를 넘겨 텍스트를 추출할 수 있습니다.
+
+```python
+from openai import OpenAI
+import base64
+
+client = OpenAI(base_url="http://localhost:8080/v1", api_key="dummy")
+
+with open("page.png", "rb") as f:
+    img_b64 = base64.b64encode(f.read()).decode()
+
+response = client.chat.completions.create(
+    model="PaddleOCR-VL-1.5-0.9B",
+    messages=[{
+        "role": "user",
+        "content": [
+            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{img_b64}"}},
+            {"type": "text", "text": "이 표에서 재료명, 허용응력 값을 JSON으로 추출해주세요."},
+        ],
+    }],
+)
+print(response.choices[0].message.content)
+```
+
+> Windows WSL2 사용자는 Docker Desktop이 실행 중인 상태에서 WSL Ubuntu 터미널에서 위 명령을 실행하세요.
