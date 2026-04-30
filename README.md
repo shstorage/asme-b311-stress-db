@@ -40,7 +40,7 @@ build_db.py       ── SQLite DB 생성 (asme_b311.db)
 export_csv.py     ── CSV 내보내기 (output/*.csv)
 ```
 
-- VLM/OCR 불사용 — PyMuPDF 좌표 기반 파싱 (결정적, 빠름)
+- **GPU/Docker/VLM 불필요** — PyMuPDF 좌표 기반 파싱 (결정적, 빠름)
 - 이탤릭 폰트(Cambria-Italic) 감지로 creep 구간 자동 표시
 - 전체 실행 약 **2분 이내**
 
@@ -92,8 +92,9 @@ TABLE_RANGES = {
 
 ## 사전 요구사항
 
-| 항목 | 버전 |
+| 항목 | 내용 |
 |------|------|
+| OS | Ubuntu / macOS / Windows(WSL2) |
 | Python | 3.11 이상 |
 | [uv](https://docs.astral.sh/uv/) | 최신 |
 | ASME B31.1 PDF | 직접 구매 후 프로젝트 루트에 `ASME-B31.1.pdf` 로 배치 |
@@ -105,19 +106,22 @@ TABLE_RANGES = {
 
 ## 설치 및 실행
 
-> **이 파이프라인은 GPU/Docker/VLM 없이 순수 PyMuPDF 텍스트 파싱만으로 동작합니다.**  
-> Python + uv만 있으면 바로 실행 가능합니다.
+> **GPU/Docker 불필요 — Python + uv만 있으면 어느 OS에서든 동일하게 실행됩니다.**
 
-### Ubuntu (권장)
+### 1. uv 설치
 
-#### 1. uv 설치
-
+**Ubuntu / macOS / WSL2:**
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 source $HOME/.local/bin/env   # 또는 새 터미널 열기
 ```
 
-#### 2. 저장소 클론 및 의존성 설치
+**Windows (PowerShell):**
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+### 2. 저장소 클론 및 의존성 설치
 
 ```bash
 git clone https://github.com/shstorage/asme-b311-stress-db.git
@@ -126,14 +130,16 @@ cd asme-b311-stress-db
 uv sync   # pyproject.toml 기반으로 가상환경 + 패키지 자동 설치
 ```
 
-#### 3. PDF 배치
+### 3. PDF 배치
 
 ```bash
 # 구매한 ASME-B31.1.pdf 를 프로젝트 루트에 복사
 cp /path/to/ASME-B31.1.pdf .
 ```
 
-#### 4. 파이프라인 실행
+**Windows 사용자:** 탐색기에서 프로젝트 폴더에 직접 복사해도 됩니다.
+
+### 4. 파이프라인 실행
 
 ```bash
 # Step 1: PDF → PNG 렌더링 + 이탤릭 span 추출 (~1분)
@@ -153,91 +159,6 @@ uv run python validate.py
 ```
 
 정상 완료 시 마지막 줄에 `Validation passed.` 출력
-
----
-
-### Windows — WSL2 + Docker 사용
-
-Windows에서는 **WSL2(Windows Subsystem for Linux)** 환경에서 실행합니다.
-
-#### 1. WSL2 설치
-
-PowerShell을 **관리자 권한**으로 열고:
-
-```powershell
-wsl --install
-```
-
-설치 완료 후 **PC 재시작** → Ubuntu 터미널이 자동으로 열리면 사용자명/비밀번호 설정.
-
-> 이미 WSL1이 설치되어 있다면 버전 업그레이드:
-> ```powershell
-> wsl --set-default-version 2
-> wsl --update
-> ```
-
-#### 2. Docker Desktop 설치
-
-1. [Docker Desktop for Windows](https://www.docker.com/products/docker-desktop/) 다운로드 후 설치
-2. Docker Desktop 실행 → **Settings > Resources > WSL Integration** 에서 Ubuntu 토글 **ON**
-3. Ubuntu WSL 터미널에서 확인:
-   ```bash
-   docker --version   # Docker version 2x.x.x 출력되면 성공
-   ```
-
-#### 3. WSL Ubuntu 터미널에서 uv 설치
-
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-source $HOME/.local/bin/env
-```
-
-#### 4. 저장소 클론 및 의존성 설치
-
-WSL Ubuntu 터미널에서:
-
-```bash
-# WSL 홈 디렉토리에 클론 (Windows 경로 /mnt/c/... 보다 WSL 내부가 훨씬 빠름)
-cd ~
-git clone https://github.com/shstorage/asme-b311-stress-db.git
-cd asme-b311-stress-db
-
-uv sync
-```
-
-#### 5. PDF 배치
-
-Windows 탐색기에서 PDF를 복사하려면 WSL 경로를 사용:
-
-```
-탐색기 주소창에 입력: \\wsl$\Ubuntu\home\<사용자명>\asme-b311-stress-db
-```
-
-해당 폴더에 `ASME-B31.1.pdf` 붙여넣기. 또는 WSL 터미널에서:
-
-```bash
-cp /mnt/c/Users/<윈도우사용자명>/Downloads/ASME-B31.1.pdf .
-```
-
-#### 6. 파이프라인 실행
-
-Ubuntu와 동일:
-
-```bash
-uv run python -m extract.render_pages
-uv run python -m extract.merge_pairs
-uv run python -m extract.build_db
-uv run python export_csv.py
-uv run python validate.py
-```
-
-#### 7. 결과물 확인 (Windows 탐색기에서)
-
-```
-탐색기 주소창: \\wsl$\Ubuntu\home\<사용자명>\asme-b311-stress-db\output
-```
-
-`stress_wide.csv` 등을 Excel로 바로 열 수 있습니다.
 
 ---
 
@@ -310,7 +231,47 @@ PDF를 열고 텍스트를 마우스로 드래그해서 선택이 되면 → 디
 
 ### 스캔 문서일 때: PaddleOCR-VL vLLM 서버 사용
 
-NVIDIA GPU가 있는 환경에서 아래 명령으로 PaddleOCR-VL 추론 서버를 기동합니다.
+NVIDIA GPU + Docker 환경이 필요합니다.
+
+#### Docker 환경 준비 (Ubuntu)
+
+Ubuntu에 Docker가 설치되어 있지 않다면:
+
+```bash
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER   # 재로그인 후 적용
+```
+
+#### Docker 환경 준비 (Windows)
+
+Windows에서는 WSL2 위에서 Docker Desktop을 사용합니다.
+
+**① WSL2 설치** — PowerShell을 관리자 권한으로 열고:
+
+```powershell
+wsl --install
+```
+
+설치 완료 후 PC 재시작 → Ubuntu 터미널이 열리면 사용자명/비밀번호 설정.
+
+> 이미 WSL1이 설치되어 있다면:
+> ```powershell
+> wsl --set-default-version 2
+> wsl --update
+> ```
+
+**② Docker Desktop 설치**
+
+1. [Docker Desktop for Windows](https://www.docker.com/products/docker-desktop/) 다운로드 후 설치
+2. Docker Desktop 실행 → **Settings > Resources > WSL Integration** 에서 Ubuntu 토글 **ON**
+3. WSL Ubuntu 터미널에서 확인:
+   ```bash
+   docker --version   # Docker version 2x.x.x 출력되면 성공
+   ```
+
+#### vLLM 서버 기동
+
+Ubuntu 또는 WSL Ubuntu 터미널에서:
 
 ```bash
 docker run \
@@ -349,5 +310,3 @@ response = client.chat.completions.create(
 )
 print(response.choices[0].message.content)
 ```
-
-> Windows WSL2 사용자는 Docker Desktop이 실행 중인 상태에서 WSL Ubuntu 터미널에서 위 명령을 실행하세요.
