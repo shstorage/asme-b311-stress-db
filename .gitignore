@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environment
+.venv
+
+# PDF (저작권 파일 — 직접 구매 후 배치)
+*.pdf
+
+# 생성 데이터 (python -m extract.* 실행 시 자동 생성)
+data/pages/
+data/italic_spans/
+data/merged/
+data/raw_vlm/
+
+# 최종 산출물 (빌드 후 생성)
+asme_b311.db
+output/
+
+# 이미지 테스트용 폴더 (PaddleOCR 테스트 잔재)
+image/
+
+# IDE / 환경
+.vscode/
+.claude/
+.ipynb_checkpoints/
+.python-version

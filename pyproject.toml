@@ -1,0 +1,13 @@
+[project]
+name = "15-paddle-test"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "openai>=2.33.0",
+    "pandas>=3.0.2",
+    "pymupdf>=1.27.2.3",
+    "tenacity>=9.1.4",
+    "tqdm>=4.67.3",
+]
